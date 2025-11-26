@@ -3993,5 +3993,533 @@ document.addEventListener('DOMContentLoaded', ()=>{
       frame.style.height = (h + 20) + 'px';
     }
   </script>
+
+<!-- ===================== LOGIN FERTPI + FIREBASE AUTH ===================== -->
+<!-- Firebase SDKs (compat) -->
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+
+<style>
+  #fertpi-login-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.78);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    backdrop-filter: blur(4px);
+  }
+  .fertpi-login-modal {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 24px 26px 18px;
+    max-width: 360px;
+    width: 90%;
+    box-shadow: 0 12px 35px rgba(0,0,0,0.35);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .fertpi-login-modal h2 {
+    margin-top: 0;
+    margin-bottom: 4px;
+    font-size: 1.4rem;
+    text-align: center;
+  }
+  .fertpi-login-modal p {
+    margin-top: 0;
+    margin-bottom: 14px;
+    font-size: 0.82rem;
+    color: #555;
+    text-align: center;
+  }
+  .fertpi-login-modal label {
+    display: block;
+    font-size: 0.8rem;
+    margin-bottom: 4px;
+    color: #333;
+  }
+  .fertpi-login-modal input {
+    width: 100%;
+    padding: 7px 9px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 0.85rem;
+    box-sizing: border-box;
+    margin-bottom: 10px;
+  }
+  .fertpi-login-modal button {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 999px;
+    border: none;
+    font-size: 0.9rem;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+  #fertpi-login-btn {
+    background: #2563eb;
+    color: #fff;
+  }
+  #fertpi-login-btn:hover {
+    background: #1d4ed8;
+  }
+  #fertpi-login-msg {
+    margin-top: 6px;
+    font-size: 0.78rem;
+    min-height: 18px;
+    text-align: center;
+  }
+  #fertpi-admin-panel {
+    position: fixed;
+    top: 6px;
+    right: 6px;
+    z-index: 99990;
+    background: rgba(15, 23, 42, 0.96);
+    color: #f9fafb;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 0.78rem;
+    max-width: 340px;
+    display: none;
+  }
+  #fertpi-admin-panel h3 {
+    margin: 0 0 6px 0;
+    font-size: 0.85rem;
+  }
+  #fertpi-admin-panel button {
+    border: none;
+    border-radius: 999px;
+    padding: 4px 9px;
+    margin: 2px 0;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+  #fertpi-admin-panel button.fertpi-primary {
+    background: #22c55e;
+    color: #022c22;
+  }
+  #fertpi-admin-panel button.fertpi-logout {
+    background: #ef4444;
+    color: #fff;
+  }
+  #fertpi-admin-users {
+    max-height: 260px;
+    overflow-y: auto;
+    margin-top: 4px;
+    padding-right: 4px;
+  }
+  .fertpi-admin-user-card {
+    border-bottom: 1px solid rgba(148, 163, 184, 0.6);
+    padding: 4px 0;
+  }
+  #fertpi-user-bar {
+    position: fixed;
+    top: 6px;
+    left: 6px;
+    z-index: 99990;
+    background: rgba(15, 23, 42, 0.9);
+    color: #e5e7eb;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 0.78rem;
+    display: none;
+    align-items: center;
+    gap: 6px;
+  }
+  #fertpi-user-bar button {
+    border: none;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    background: #ef4444;
+    color: #fff;
+  }
+</style>
+
+<div id="fertpi-admin-panel">
+  <h3>Admin FertPI</h3>
+  <div style="margin-bottom:4px;">
+    <button class="fertpi-primary" onclick="fertpiAdminCreateUser()">Criar usuário</button>
+    <button class="fertpi-logout" onclick="fertpiLogout()">Sair (admin)</button>
+  </div>
+  <div id="fertpi-admin-users"></div>
+</div>
+
+<div id="fertpi-user-bar">
+  <span id="fertpi-user-label"></span>
+  <button onclick="fertpiLogout()">Sair</button>
+</div>
+
+<div id="fertpi-login-overlay">
+  <div class="fertpi-login-modal">
+    <h2>Login FertPI</h2>
+    <p>Entre com o acesso liberado pelo administrador.</p>
+    <label for="fertpi-login-email">E-mail</label>
+    <input id="fertpi-login-email" autocomplete="email" />
+    <label for="fertpi-login-pass">Senha</label>
+    <input id="fertpi-login-pass" type="password" autocomplete="current-password" />
+    <button id="fertpi-login-btn" onclick="fertpiLogin()">Entrar</button>
+    <div id="fertpi-login-msg"></div>
+  </div>
+</div>
+
+<script>
+// ======================== FERTPI + FIREBASE AUTH ============================
+(function() {
+  // 1. CONFIGURAÇÃO DO FIREBASE
+  // Substitua os valores abaixo pelos dados reais do seu projeto Firebase
+  const firebaseConfig = {
+    apiKey: " <script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyCury96tPh0R31hR-u2vyLIZZ4vvZ4quNw",
+    authDomain: "fertpi.firebaseapp.com",
+    projectId: "fertpi",
+    storageBucket: "fertpi.firebasestorage.app",
+    messagingSenderId: "651265624054",
+    appId: "1:651265624054:web:4399fabb6ab1d7bfcde9d7"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+</script> ",
+
+
+    authDomain: "SEU_PROJETO.firebaseapp.com",
+    projectId: "SEU_PROJETO",
+    // opcionalmente:
+    // storageBucket: "...",
+    // messagingSenderId: "...",
+    // appId: "..."
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  // App secundário só para o admin criar usuários sem derrubar a própria sessão
+  const adminApp = firebase.initializeApp(firebaseConfig, "adminApp");
+  const adminAuth = adminApp.auth();
+
+  const USERS_COLLECTION = "users";
+
+  let currentUser = null;      // auth user
+  let currentUserDoc = null;   // dados no Firestore
+  let currentUserUnsub = null;
+  let adminUsersUnsub = null;
+
+  function showOverlay() {
+    const el = document.getElementById("fertpi-login-overlay");
+    if (el) el.style.display = "flex";
+  }
+
+  function hideOverlay() {
+    const el = document.getElementById("fertpi-login-overlay");
+    if (el) el.style.display = "none";
+  }
+
+  function setLoginMessage(msg, isError) {
+    const el = document.getElementById("fertpi-login-msg");
+    if (!el) return;
+    el.textContent = msg || "";
+    el.style.color = isError ? "#b91c1c" : "#059669";
+  }
+
+  function setUserBar(userDoc) {
+    const bar = document.getElementById("fertpi-user-bar");
+    const label = document.getElementById("fertpi-user-label");
+    if (!bar || !label) return;
+    if (!userDoc) {
+      bar.style.display = "none";
+      return;
+    }
+    const roleStr = userDoc.role === "admin" ? " (admin)" : " (usuário)";
+    label.textContent = "Usuário: " + (userDoc.email || "") + roleStr;
+    bar.style.display = "flex";
+  }
+
+  function formatRemainingTime(expiresAt) {
+    if (!expiresAt) return "Sem prazo definido";
+    const ms = (expiresAt.toMillis ? expiresAt.toMillis() : expiresAt) - Date.now();
+    if (ms <= 0) return "Expirado";
+    const totalSeconds = Math.floor(ms / 1000);
+    const days = Math.floor(totalSeconds / (24 * 3600));
+    const hours = Math.floor((totalSeconds % (24 * 3600)) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const parts = [];
+    if (days) parts.push(days + "d");
+    if (hours) parts.push(hours + "h");
+    if (minutes || (!days && !hours)) parts.push(minutes + "min");
+    return parts.join(" ");
+  }
+
+  function updateAdminPanel(usersSnapshot) {
+    const painel = document.getElementById("fertpi-admin-panel");
+    const container = document.getElementById("fertpi-admin-users");
+    if (!painel || !container) return;
+
+    if (!currentUserDoc || currentUserDoc.role !== "admin") {
+      painel.style.display = "none";
+      container.innerHTML = "";
+      return;
+    }
+
+    painel.style.display = "block";
+    container.innerHTML = "";
+
+    usersSnapshot.forEach(doc => {
+      const data = doc.data();
+      const email = data.email || "(sem e-mail)";
+      const role = data.role || "usuario";
+      const active = !!data.active;
+      const expiresAt = data.expiresAt || null;
+      const expiraStr = expiresAt
+        ? (expiresAt.toDate ? expiresAt.toDate().toLocaleString() : new Date(expiresAt).toLocaleString())
+        : "Sem prazo";
+      const restante = formatRemainingTime(expiresAt);
+
+      const div = document.createElement("div");
+      div.className = "fertpi-admin-user-card";
+      div.innerHTML = `
+        <div><strong>${email}</strong> (${role})</div>
+        <div>Status: ${active ? "Ativo" : "Bloqueado"}</div>
+        <div>Expira em: ${expiraStr}</div>
+        <div>Restante: ${restante}</div>
+        <div style="margin-top:3px; display:flex; flex-wrap:wrap; gap:4px;">
+          <button onclick="fertpiAdminSetExpiration('${doc.id}')">Definir prazo</button>
+          <button onclick="fertpiAdminBlockUser('${doc.id}')">Bloquear</button>
+          <button onclick="fertpiAdminUnblockUser('${doc.id}')">Desbloquear</button>
+        </div>
+      `;
+      container.appendChild(div);
+    });
+  }
+
+  // ------------------- AÇÕES DO ADMIN NO FIRESTORE -------------------
+  window.fertpiAdminCreateUser = async function() {
+    if (!currentUserDoc || currentUserDoc.role !== "admin") {
+      alert("Apenas administrador pode criar usuários.");
+      return;
+    }
+    const email = prompt("E-mail do novo usuário:");
+    if (!email) return;
+    const password = prompt("Senha do novo usuário:");
+    if (!password) return;
+    const rolePrompt = (prompt("Tipo (admin/usuario):", "usuario") || "usuario").toLowerCase();
+    const role = (rolePrompt === "admin") ? "admin" : "usuario";
+
+    try {
+      const cred = await adminAuth.createUserWithEmailAndPassword(email, password);
+      const uid = cred.user.uid;
+      await db.collection(USERS_COLLECTION).doc(uid).set({
+        email,
+        role,
+        active: false,          // começa bloqueado até você liberar
+        expiresAt: null,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      alert("Usuário criado! Ele ainda está bloqueado até você definir o prazo.");
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao criar usuário: " + err.message);
+    }
+  };
+
+  window.fertpiAdminSetExpiration = async function(uid) {
+    if (!currentUserDoc || currentUserDoc.role !== "admin") {
+      alert("Apenas administrador pode definir prazo.");
+      return;
+    }
+    const diasStr = prompt("Liberar acesso por quantos dias?", "7");
+    const dias = Number(diasStr);
+    if (!dias || dias <= 0) return;
+
+    const ms = dias * 24 * 60 * 60 * 1000;
+    const expiresAt = new Date(Date.now() + ms);
+
+    try {
+      await db.collection(USERS_COLLECTION).doc(uid).update({
+        expiresAt: firebase.firestore.Timestamp.fromDate(expiresAt),
+        active: true
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao definir prazo: " + err.message);
+    }
+  };
+
+  window.fertpiAdminBlockUser = async function(uid) {
+    if (!currentUserDoc || currentUserDoc.role !== "admin") {
+      alert("Apenas administrador pode bloquear.");
+      return;
+    }
+    try {
+      await db.collection(USERS_COLLECTION).doc(uid).update({ active: false });
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao bloquear usuário: " + err.message);
+    }
+  };
+
+  window.fertpiAdminUnblockUser = async function(uid) {
+    if (!currentUserDoc || currentUserDoc.role !== "admin") {
+      alert("Apenas administrador pode desbloquear.");
+      return;
+    }
+    try {
+      await db.collection(USERS_COLLECTION).doc(uid).update({ active: true });
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao desbloquear usuário: " + err.message);
+    }
+  };
+
+  // -------------------- LOGIN / LOGOUT --------------------
+  window.fertpiLogin = async function() {
+    const emailEl = document.getElementById("fertpi-login-email");
+    const passEl = document.getElementById("fertpi-login-pass");
+    if (!emailEl || !passEl) return;
+
+    const email = (emailEl.value || "").trim();
+    const password = passEl.value || "";
+    if (!email || !password) {
+      setLoginMessage("Informe e-mail e senha.", true);
+      return;
+    }
+
+    try {
+      setLoginMessage("Entrando...", false);
+      await auth.signInWithEmailAndPassword(email, password);
+      // o resto é tratado pelo onAuthStateChanged
+    } catch (err) {
+      console.error(err);
+      setLoginMessage("Erro ao entrar: " + err.message, true);
+    }
+  };
+
+  window.fertpiLogout = async function() {
+    try {
+      await auth.signOut();
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao sair: " + err.message);
+    }
+  };
+
+  // -------------------- SUBSCRIÇÕES (SESSÃO) --------------------
+  function subscribeCurrentUserDoc(uid) {
+    if (currentUserUnsub) {
+      currentUserUnsub();
+      currentUserUnsub = null;
+    }
+    currentUserUnsub = db.collection(USERS_COLLECTION).doc(uid).onSnapshot(async doc => {
+      if (!doc.exists) {
+        // cria doc padrão: usuário existe no Auth mas ainda não tem doc => fica aguardando liberação
+        const user = auth.currentUser;
+        if (user) {
+          await db.collection(USERS_COLLECTION).doc(uid).set({
+            email: user.email || "",
+            role: "usuario",
+            active: false,
+            expiresAt: null,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+        }
+        currentUserDoc = null;
+        setUserBar(null);
+        setLoginMessage("Aguarde liberação do administrador.", true);
+        showOverlay();
+        return;
+      }
+
+      currentUserDoc = doc.data();
+
+      // regras de acesso
+      const active = !!currentUserDoc.active;
+      const expiresAt = currentUserDoc.expiresAt || null;
+      const expired = expiresAt && ( (expiresAt.toMillis ? expiresAt.toMillis() : expiresAt) <= Date.now() );
+
+      if (!active || expired) {
+        if (expired) {
+          alert("Seu tempo de acesso expirou.");
+        } else {
+          alert("Seu acesso está bloqueado. Contate o administrador.");
+        }
+        try {
+          await auth.signOut();
+        } catch (e) {}
+        return;
+      }
+
+      hideOverlay();
+      setUserBar(currentUserDoc);
+
+      if (currentUserDoc.role === "admin") {
+        subscribeAdminUsers();
+      } else {
+        if (adminUsersUnsub) {
+          adminUsersUnsub();
+          adminUsersUnsub = null;
+        }
+        const painel = document.getElementById("fertpi-admin-panel");
+        if (painel) painel.style.display = "none";
+      }
+    }, err => {
+      console.error("Erro ao ouvir usuário atual:", err);
+    });
+  }
+
+  function subscribeAdminUsers() {
+    if (adminUsersUnsub) {
+      adminUsersUnsub();
+      adminUsersUnsub = null;
+    }
+    adminUsersUnsub = db.collection(USERS_COLLECTION).orderBy("email").onSnapshot(
+      snap => {
+        updateAdminPanel(snap);
+      },
+      err => {
+        console.error("Erro ao ouvir lista de usuários:", err);
+      }
+    );
+  }
+
+  // -------------------- OBSERVADOR GLOBAL DE AUTENTICAÇÃO --------------------
+  auth.onAuthStateChanged(user => {
+    currentUser = user;
+
+    if (!user) {
+      currentUserDoc = null;
+      setUserBar(null);
+      setLoginMessage("", false);
+      showOverlay();
+      const painel = document.getElementById("fertpi-admin-panel");
+      if (painel) painel.style.display = "none";
+      if (currentUserUnsub) { currentUserUnsub(); currentUserUnsub = null; }
+      if (adminUsersUnsub) { adminUsersUnsub(); adminUsersUnsub = null; }
+      return;
+    }
+
+    // usuário logado: assina o documento dele
+    hideOverlay();
+    subscribeCurrentUserDoc(user.uid);
+  });
+
+  // Quando o DOM estiver pronto, mostrar overlay até o Firebase decidir
+  document.addEventListener("DOMContentLoaded", function() {
+    showOverlay();
+  });
+})();
+// ====================== FIM FERTPI + FIREBASE AUTH ===========================
+</script>
 </body>
 </html>
